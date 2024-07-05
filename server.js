@@ -12,7 +12,7 @@ app.use(express.static('public'));
 app.get('/', (req, res) => {
     res.redirect('/about');
 });
-//////////////////////////////////////////////////////////////////////
+
 
 app.get('/about', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'about.html'));
@@ -58,3 +58,4 @@ storeService.initialize().then(() => {
 }).catch((err) => {
     console.log(`Unable to start server: ${err}`);
 });
+/////////////////////////////
