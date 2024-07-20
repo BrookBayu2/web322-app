@@ -59,3 +59,53 @@ module.exports.getCategories = function() {
         resolve(categories);
     });
 };
+
+module.exports.addItem = function(itemData) {
+    return new Promise((resolve, reject) => {
+        if (!itemData.published) {
+            itemData.published = false;
+        } else {
+            itemData.published = true;
+        }
+
+        itemData.id = items.length + 1;
+        items.push(itemData);
+        resolve(itemData);
+    });
+};
+
+
+module.exports.getItemsByCategory = function(category) {
+    return new Promise((resolve, reject) => {
+        const filteredItems = items.filter(item => item.category == category);
+        if (filteredItems.length === 0) {
+            reject("No results returned");
+            return;
+        }
+        resolve(filteredItems);
+    });
+};
+
+
+module.exports.getItemsByMinDate = function(minDateStr) {
+    return new Promise((resolve, reject) => {
+        const filteredItems = items.filter(item => new Date(item.postDate) >= new Date(minDateStr));
+        if (filteredItems.length === 0) {
+            reject("No results returned");
+            return;
+        }
+        resolve(filteredItems);
+    });
+};
+
+
+module.exports.getItemById = function(id) {
+    return new Promise((resolve, reject) => {
+        const item = items.find(item => item.id == id);
+        if (!item) {
+            reject("No results returned");
+            return;
+        }
+        resolve(item);
+    });
+};
