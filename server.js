@@ -20,6 +20,8 @@ const { v2: cloudinary } = require('cloudinary');
 const streamifier = require('streamifier'); 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const dotenv = require('dotenv');
+dotenv.config();
 
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
