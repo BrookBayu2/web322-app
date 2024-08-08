@@ -1,0 +1,24 @@
+<h1>Shop</h1>
+
+<h2>Items</h2>
+<ul>
+    {{#each items}}
+    <li><a href="/shop/{{this.id}}">{{this.title}} - ${{this.price}}</a></li>
+    {{/each}}
+</ul>
+
+<h2>Categories</h2>
+<ul>
+    {{#each categories}}
+    <li><a href="/shop?category={{this.id}}">{{this.name}}</a></li>
+    {{/each}}
+</ul>
+
+{{#if item}}
+<div>
+    <h2>{{item.title}}</h2>
+    <p>{{item.body}}</p>
+    <p>Price: ${{item.price}}</p>
+    <img src="{{item.featureImage}}" alt="{{item.title}}">
+</div>
+{{/if}}

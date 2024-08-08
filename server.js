@@ -1,151 +1,184 @@
-/*********************************************************************************
-* WEB322 – Assignment 04
-* I declare that this assignment is my own work in accordance with Seneca Academic Policy. No part 
-* of this assignment has been copied manually or electronically from any other source 
-* (including 3rd party web sites) or distributed to other students.
-* 
-* Name: Biruk Abebe Student ID: 168432227 Date: 7/20/24
-*
-* Vercel Web App URL: ________________________________________________________
-* 
-* GitHub Repository URL: https://github.com/BrookBayu2/web322-app/tree/app
-*
-********************************************************************************/
-
 const express = require('express');
+const exphbs = require('express-handlebars');
 const path = require('path');
-const storeService = require('./store-server'); 
-const multer = require('multer'); 
-const { v2: cloudinary } = require('cloudinary'); 
-const streamifier = require('streamifier'); 
+const stripJs = require('strip-js');
+const itemData = require('./store-server.js');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const dotenv = require('dotenv');
 dotenv.config();
 
+
+app.engine('.hbs', exphbs.engine({
+    extname: '.hbs',
+    defaultLayout: 'main',
+    layoutsDir: path.join(__dirname, 'views/layouts'),
+    helpers: {
+        safeHTML: function(context) {
+            return stripJs(context);
+        },
+        equals: function(a, b, options) {
+            if (a === b) {
+                return options.fn(this); 
+            } else {
+                return options.inverse(this); 
+            }
+        },
+        formatDate: function(dateObj){
+            let year = dateObj.getFullYear();
+            let month = (dateObj.getMonth() + 1).toString();
+            let day = dateObj.getDate().toString();
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2,'0')}`;
+        }
+    }
+}));
+app.set('view engine', '.hbs');
+
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 
 
-cloudinary.config({
-    cloud_name: 'dpxllbzh8', 
-    api_key: '256192282584981', 
-    api_secret: 'ctwCZLn5IFzg6DVRKGCArktNCQU', 
-    secure: true
+app.use((req, res, next) => {
+    let route = req.path.substring(1);
+    app.locals.activeRoute = "/" + (route ? route : 'shop');
+    app.locals.viewingCategory = req.query.category;
+    next();
 });
 
-
-const upload = multer(); 
 
 app.get('/', (req, res) => {
-    res.redirect('/about');
-});
-
-app.get('/about', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'about.html'));
+    res.redirect('/shop');
 });
 
 app.get('/shop', async (req, res) => {
     try {
-        const data = await storeService.getPublishedItems();
-        res.json(data);
+        let items, categories, item = null;
+        if (req.query.category) {
+            items = await itemData.getPublishedItemsByCategory(req.query.category);
+        } else {
+            items = await itemData.getPublishedItems();
+        }
+        categories = await itemData.getCategories();
+
+        if (req.query.id) {
+            item = await itemData.getItemById(req.query.id);
+        }
+
+        res.render('shop', { items, categories, item, viewingCategory: req.query.category });
     } catch (err) {
-        res.status(500).json({ message: err });
+        console.error(`Error fetching shop data: ${err}`);
+        res.render('shop', { message: 'Error loading shop data. Please try again later.' });
     }
 });
+
+app.get('/shop/:id', async (req, res) => {
+    try {
+        const item = await itemData.getItemById(req.params.id);
+        const items = await itemData.getPublishedItems();
+        const categories = await itemData.getCategories();
+
+        res.render('shop', { item, items, categories });
+    } catch (err) {
+        console.error(`Error fetching item data: ${err}`);
+        res.render('shop', { message: 'Item not found.' });
+    }
+});
+
+
+app.get('/about', (req, res) => {
+    res.render('about', { title: 'About - Biruk Abebe', studentName: 'Biruk Abebe' });
+});
+
+
+app.get('/items/add', async (req, res) => {
+    try {
+        const categories = await itemData.getCategories();
+        res.render('addItem', { title: 'Add Item - Biruk Abebe', studentName: 'Biruk Abebe', categories });
+    } catch (err) {
+        res.render('addItem', { title: 'Add Item - Biruk Abebe', studentName: 'Biruk Abebe', categories: [] });
+    }
+});
+
 
 app.get('/items', async (req, res) => {
     try {
-        let data;
-        if (req.query.category) {
-            data = await storeService.getItemsByCategory(req.query.category);
-        } else if (req.query.minDate) {
-            data = await storeService.getItemsByMinDate(req.query.minDate);
+        const items = await itemData.getAllItems();
+        if (items.length > 0) {
+            res.render('items', { items });
         } else {
-            data = await storeService.getAllItems();
+            res.render('items', { message: "no results" });
         }
-        res.json(data);
     } catch (err) {
-        res.status(500).json({ message: err });
+        console.error(`Error fetching items: ${err}`);
+        res.render('items', { message: 'No results returned' });
     }
 });
+
 
 app.get('/categories', async (req, res) => {
     try {
-        const data = await storeService.getCategories();
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ message: err });
-    }
-});
-
-
-app.get('/items/add', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'addItem.html'));
-});
-
-
-app.post('/items/add', upload.single('featureImage'), (req, res) => {
-    if (req.file) {
-        let streamUpload = (req) => {
-            return new Promise((resolve, reject) => {
-                let stream = cloudinary.uploader.upload_stream(
-                    (error, result) => {
-                        if (result) {
-                            resolve(result);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                );
-                streamifier.createReadStream(req.file.buffer).pipe(stream);
-            });
-        };
-
-        async function upload(req) {
-            let result = await streamUpload(req);
-            console.log("Image uploaded successfully:", result);
-            return result;
+        const categories = await itemData.getCategories();
+        if (categories.length > 0) {
+            res.render('categories', { categories });
+        } else {
+            res.render('categories', { message: "no results" });
         }
-
-        upload(req).then((uploaded) => {
-            processItem(uploaded.url);
-        }).catch((error) => {
-            console.error("Image upload failed:", error); 
-            res.status(500).send("Image upload failed.");
-        });
-    } else {
-        processItem("");
-    }
-
-    function processItem(imageUrl) {
-        req.body.featureImage = imageUrl;
-       
-        storeService.addItem(req.body).then(() => {
-            res.redirect('/items');
-        }).catch((err) => {
-            res.status(500).send("Unable to add item.");
-        });
-    }
-});
-
-app.get('/item/:id', async (req, res) => {
-    try {
-        const data = await storeService.getItemById(req.params.id);
-        res.json(data);
     } catch (err) {
-        res.status(500).json({ message: err });
+        console.error(`Error fetching categories: ${err}`);
+        res.render('categories', { message: 'No results returned' });
     }
 });
+
+
+app.post('/categories/add', async (req, res) => {
+    try {
+        await itemData.addCategory(req.body);
+        res.redirect('/categories');
+    } catch (err) {
+        res.status(500).send("Unable to add category");
+    }
+});
+
+
+app.get('/categories/delete/:id', async (req, res) => {
+    try {
+        await itemData.deleteCategoryById(req.params.id);
+        res.redirect('/categories');
+    } catch (err) {
+        res.status(500).send("Unable to remove category / Category not found");
+    }
+});
+
+
+app.post('/items/add', async (req, res) => {
+    try {
+        await itemData.addItem(req.body);
+        res.redirect('/items');
+    } catch (err) {
+        res.status(500).send("Unable to add item");
+    }
+});
+
+
+app.get('/items/delete/:id', async (req, res) => {
+    try {
+        await itemData.deleteItemById(req.params.id);
+        res.redirect('/items');
+    } catch (err) {
+        res.status(500).send("Unable to remove item / Item not found");
+    }
+});
+
 
 app.use((req, res) => {
-    res.status(404).send("Page Not Found");
+    res.status(404).render('404');
 });
 
-storeService.initialize().then(() => {
+
+itemData.initialize().then(() => {
     app.listen(PORT, () => {
-        console.log(`Express http server listening on port ${PORT}`);
+        console.log(`Server is running on port ${PORT}`);
     });
 }).catch((err) => {
-    console.log(`Unable to start server: ${err}`);
+    console.error(`Failed to initialize the server: ${err}`);
 });

@@ -1,111 +1,129 @@
-const fs = require('fs');
-const path = require('path');
+const Sequelize = require('sequelize');
 
-let items = [];
-let categories = [];
+
+const sequelize = new Sequelize('newdb', 'postgres', '1219', {
+    host: 'localhost', 
+    dialect: 'postgres',
+    port: 5432,
+    dialectOptions: {
+        
+    },
+    query: { raw: true }
+});
+
+
+const Item = sequelize.define('Item', {
+    body: Sequelize.TEXT,
+    title: Sequelize.STRING,
+    itemDate: Sequelize.DATE,
+    featureImage: Sequelize.STRING,
+    published: Sequelize.BOOLEAN,
+    price: Sequelize.DOUBLE
+});
+
+const Category = sequelize.define('Category', {
+    category: Sequelize.STRING
+});
+
+
+Item.belongsTo(Category, { foreignKey: 'category' });
 
 module.exports.initialize = function() {
     return new Promise((resolve, reject) => {
-        const itemsPath = path.join(__dirname, 'data', 'items.json');
-        console.log('Reading items from:', itemsPath);
-        fs.readFile(itemsPath, 'utf8', (err, data) => {
-            if (err) {
-                reject("Unable to read items file");
-                return;
-            }
-            items = JSON.parse(data);
-
-            const categoriesPath = path.join(__dirname, 'data', 'categories.json');
-            console.log('Reading categories from:', categoriesPath);
-            fs.readFile(categoriesPath, 'utf8', (err, data) => {
-                if (err) {
-                    reject("Unable to read categories file");
-                    return;
-                }
-                categories = JSON.parse(data);
-                resolve();
-            });
-        });
+        sequelize.sync()
+            .then(() => resolve())
+            .catch(err => reject(`unable to sync the database: ${err.message}`));
     });
 };
 
 module.exports.getAllItems = function() {
     return new Promise((resolve, reject) => {
-        if (items.length === 0) {
-            reject("No results returned");
-            return;
-        }
-        resolve(items);
+        Item.findAll()
+            .then(data => resolve(data))
+            .catch(err => reject(`no results returned: ${err.message}`));
     });
 };
 
 module.exports.getPublishedItems = function() {
     return new Promise((resolve, reject) => {
-        const publishedItems = items.filter(item => item.published);
-        if (publishedItems.length === 0) {
-            reject("No results returned");
-            return;
-        }
-        resolve(publishedItems);
+        Item.findAll({ where: { published: true } })
+            .then(data => resolve(data))
+            .catch(err => reject(`no results returned: ${err.message}`));
     });
 };
 
 module.exports.getCategories = function() {
     return new Promise((resolve, reject) => {
-        if (categories.length === 0) {
-            reject("No results returned");
-            return;
-        }
-        resolve(categories);
+        Category.findAll()
+            .then(data => resolve(data))
+            .catch(err => reject(`no results returned: ${err.message}`));
+    });
+};
+
+module.exports.getItemsByCategory = function(category) {
+    return new Promise((resolve, reject) => {
+        Item.findAll({ where: { category: category } })
+            .then(data => resolve(data))
+            .catch(err => reject(`no results returned: ${err.message}`));
+    });
+};
+
+module.exports.getPublishedItemsByCategory = function(category) {
+    return new Promise((resolve, reject) => {
+        Item.findAll({ where: { published: true, category: category } })
+            .then(data => resolve(data))
+            .catch(err => reject(`no results returned: ${err.message}`));
+    });
+};
+
+module.exports.getItemById = function(id) {
+    return new Promise((resolve, reject) => {
+        Item.findAll({ where: { id: id } })
+            .then(data => resolve(data[0]))
+            .catch(err => reject(`no results returned: ${err.message}`));
     });
 };
 
 module.exports.addItem = function(itemData) {
     return new Promise((resolve, reject) => {
-        if (!itemData.published) {
-            itemData.published = false;
-        } else {
-            itemData.published = true;
+        itemData.published = (itemData.published) ? true : false;
+        for (let key in itemData) {
+            if (itemData[key] === "") {
+                itemData[key] = null;
+            }
         }
-
-        itemData.id = items.length + 1;
-        items.push(itemData);
-        resolve(itemData);
+        itemData.itemDate = new Date();
+        Item.create(itemData)
+            .then(() => resolve())
+            .catch(err => reject(`unable to create item: ${err.message}`));
     });
 };
 
-
-module.exports.getItemsByCategory = function(category) {
+module.exports.addCategory = function(categoryData) {
     return new Promise((resolve, reject) => {
-        const filteredItems = items.filter(item => item.category == category);
-        if (filteredItems.length === 0) {
-            reject("No results returned");
-            return;
+        for (let key in categoryData) {
+            if (categoryData[key] === "") {
+                categoryData[key] = null;
+            }
         }
-        resolve(filteredItems);
+        Category.create(categoryData)
+            .then(() => resolve())
+            .catch(err => reject(`unable to create category: ${err.message}`));
     });
 };
 
-
-module.exports.getItemsByMinDate = function(minDateStr) {
+module.exports.deleteCategoryById = function(id) {
     return new Promise((resolve, reject) => {
-        const filteredItems = items.filter(item => new Date(item.postDate) >= new Date(minDateStr));
-        if (filteredItems.length === 0) {
-            reject("No results returned");
-            return;
-        }
-        resolve(filteredItems);
+        Category.destroy({ where: { id: id } })
+            .then(() => resolve())
+            .catch(err => reject(`unable to remove category / category not found: ${err.message}`));
     });
 };
 
-
-module.exports.getItemById = function(id) {
+module.exports.deleteItemById = function(id) {
     return new Promise((resolve, reject) => {
-        const item = items.find(item => item.id == id);
-        if (!item) {
-            reject("No results returned");
-            return;
-        }
-        resolve(item);
+        Item.destroy({ where: { id: id } })
+            .then(() => resolve())
+            .catch(err => reject(`unable to remove item / item not found: ${err.message}`));
     });
 };

@@ -1,6 +1,6 @@
 [
-    { "id": 1, "name": "Electronics" },
-    { "id": 2, "name": "Books" },
+    { "id": 1, "name": "Electronics", "image": "/images/elctronic.jpeg" },
+    { "id": 2, "name": "Books", "image": "/images/book.jpeg" },
     { "id": 3, "name": "Clothing" },
     { "id": 4, "name": "Home & Kitchen" },
     { "id": 5, "name": "Sports" },
